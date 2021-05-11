@@ -1,0 +1,348 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "ElasticSearch Deployment Test",
+    "Metadata": {
+
+    },
+    "Parameters": {
+    
+    },
+    "Mappings": {
+
+    },
+    "Conditions": {
+
+    },
+    "Resources": {
+        "ECSTaskExecutionRole": {
+            "Type" : "AWS::IAM::Role",
+            "Properties" : {
+                "RoleName" : "ECSTaskExecutionRole",
+                "Description" : "ECS Task Execution Role for Containers",
+                "AssumeRolePolicyDocument" : 
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                      {
+                        "Sid": "",
+                        "Effect": "Allow",
+                        "Principal": {
+                          "Service": "ecs-tasks.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                      }
+                    ]
+                }
+              }
+        },        
+        "AmazonECSTaskExecutionRolePolicy": {
+            "Type" : "AWS::IAM::Policy",
+            "Properties" : {
+                "PolicyDocument" : {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "ecr:GetAuthorizationToken",
+                          "ecr:BatchCheckLayerAvailability",
+                          "ecr:GetDownloadUrlForLayer",
+                          "ecr:BatchGetImage",
+                          "logs:CreateLogStream",
+                          "logs:PutLogEvents"
+                        ],
+                        "Resource": "*"
+                      }
+                    ]
+                },
+                "PolicyName" : "AmazonECSTaskExecutionRolePolicy",
+                "Roles" : [ { "Ref" : "ECSTaskExecutionRole" } ]
+              }
+        },
+        "FlowLogsRole": {
+            "Type" : "AWS::IAM::Role",
+            "Properties" : {
+                "RoleName" : "FlowLogsRole",
+                "Description" : "ECS Task Execution Role for Containers",
+                "AssumeRolePolicyDocument" : 
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                      {
+                        "Sid": "",
+                        "Effect": "Allow",
+                        "Principal": {
+                          "Service": "vpc-flow-logs.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                      }
+                    ]
+                }
+              }
+        },
+        "FlowLogsPolicy": {
+            "Type" : "AWS::IAM::Policy",
+            "Properties" : {
+                "PolicyDocument" : {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                      {
+                        "Action": [
+                          "logs:CreateLogGroup",
+                          "logs:CreateLogStream",
+                          "logs:PutLogEvents",
+                          "logs:DescribeLogGroups",
+                          "logs:DescribeLogStreams"
+                        ],
+                        "Effect": "Allow",
+                        "Resource": "*"
+                      }
+                    ]
+                  },
+                "PolicyName" : "FlowLogsPolicy",
+                "Roles" : [ { "Ref" : "FlowLogsRole" }, { "Ref" : "ECSTaskExecutionRole" } ]
+              }
+        },
+        "ECSInstanceRole": {
+            "Type" : "AWS::IAM::Role",
+            "Properties" : {
+                "RoleName" : "ECSInstanceRole",
+                "Description" : "ECS IAM Container Role",
+                "AssumeRolePolicyDocument" : 
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                      {
+                        "Sid": "",
+                        "Effect": "Allow",
+                        "Principal": {
+                          "Service": "ecs-tasks.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                      }
+                    ]
+                }
+              }
+        },
+        "AmazonEC2ContainerServiceforEC2Role":{
+            "Type":"AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName" : "AmazonEC2ContainerServiceforEC2Role",
+                "Roles" : [ { "Ref" : "ECSInstanceRole" } ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "ec2:DescribeTags",
+                                "ecs:CreateCluster",
+                                "ecs:DeregisterContainerInstance",
+                                "ecs:DiscoverPollEndpoint",
+                                "ecs:Poll",
+                                "ecs:RegisterContainerInstance",
+                                "ecs:StartTelemetrySession",
+                                "ecs:UpdateContainerInstancesState",
+                                "ecs:Submit*",
+                                "ecr:GetAuthorizationToken",
+                                "ecr:BatchCheckLayerAvailability",
+                                "ecr:GetDownloadUrlForLayer",
+                                "ecr:BatchGetImage",
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Resource": "*"
+                        }
+                    ]
+                }
+            }
+
+        },     
+        "ECSCloudWatchLogs": {
+            "Type":"AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName" : "ECSCloudWatchLogs",
+                "Roles" : [ { "Ref" : "ECSInstanceRole" } ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogGroup",
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents",
+                                "logs:DescribeLogStreams"
+                            ],
+                            "Resource": [
+                                "arn:aws:logs:*:*:*"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },        
+        "ElasticSearchDefaultInternetGateway": {
+            "Type" : "AWS::EC2::InternetGateway"
+        },
+        "ElasticSearchVPC": {
+            "Type" : "AWS::EC2::VPC",
+            "Properties" : {
+                "CidrBlock" : "10.0.0.0/16",
+                "EnableDnsHostnames" : true,
+                "EnableDnsSupport" : true       
+              }
+        },     
+        "ElasticSearchVPCGatewayAttachments": {
+            "Type" : "AWS::EC2::VPCGatewayAttachment",
+            "Properties" : {
+                "InternetGatewayId" : { "Ref" : "ElasticSearchDefaultInternetGateway" },
+                "VpcId" : { "Ref" : "ElasticSearchVPC" }
+            }
+        }, 
+        "ElasticSearchVPCSubnet": {
+            "Type" : "AWS::EC2::Subnet",
+            "Properties" : {
+                "VpcId" : { "Ref" : "ElasticSearchVPC" },
+                "CidrBlock" : "10.0.0.0/16",
+                "MapPublicIpOnLaunch" : true,
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {"Fn::GetAZs" : { "Ref" : "AWS::Region" }}
+                    ]
+                }
+              }
+        },
+        "ElasticSearchVPCSubnetRouteTable": {
+            "Type" : "AWS::EC2::RouteTable",
+            "Properties" : {
+                "VpcId" : { "Ref" : "ElasticSearchVPC" }
+              }
+        },
+        "ElasticSearchNodeRoute": {
+            "Type" : "AWS::EC2::Route",
+            "DependsOn" : "ElasticSearchDefaultInternetGateway",
+            "Properties" : {
+                "GatewayId" : { "Ref" : "ElasticSearchDefaultInternetGateway" },
+                "RouteTableId" : { "Ref" : "ElasticSearchVPCSubnetRouteTable" },
+                "DestinationCidrBlock" : "0.0.0.0/0"
+            }
+        },
+        "ElasticSearchSubnetRouteTableAssociation":{
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties" : {
+                "RouteTableId" : { "Ref" : "ElasticSearchVPCSubnetRouteTable" },
+                "SubnetId" : { "Ref" : "ElasticSearchVPCSubnet" }
+              }
+        },
+        "ElasticSearchVPCSecurityGroup": {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+                "GroupDescription" : "Security grop for Elastic Search node",
+                "GroupName" : "ElasticSearchVPCSecurityGroup",
+                "SecurityGroupEgress" : [ {
+                    "CidrIp" : "0.0.0.0/0",
+                    "Description" : "Internet outbound traffic",
+                    "FromPort" : "-1",
+                    "IpProtocol" : "-1",
+                    "ToPort" : "-1"
+                  }],
+                "SecurityGroupIngress" : [ {
+                    "CidrIp" : "0.0.0.0/0",
+                    "Description" : "Internet incoming traffic",
+                    "FromPort" : "-1",
+                    "IpProtocol" : "-1",
+                    "ToPort" : "-1"
+                  } ],
+                "VpcId" : { "Ref" : "ElasticSearchVPC" }
+              }
+        },
+        "ElasticSearchNetworkFlowLog": {
+            "Type" : "AWS::EC2::FlowLog",
+            "Properties" : {
+                "DeliverLogsPermissionArn": {"Fn::GetAtt" : ["FlowLogsRole", "Arn"] },
+                "LogDestinationType" : "cloud-watch-logs",
+                "LogGroupName" : "ElasticSearchSubnetLogs",
+                "ResourceId" : { "Ref" : "ElasticSearchVPC" },
+                "ResourceType" : "VPC",
+                "TrafficType" : "ALL"
+              }
+        },
+
+        "ElasticSearchECSCluster": {
+            "Type" : "AWS::ECS::Cluster",
+            "Properties" : {
+                "ClusterName" : "ElasticSearchECSCluster",
+                "ClusterSettings": [
+                    {
+                        "Name": "containerInsights",
+                        "Value": "enabled"
+                    }
+                ]
+              }
+        },
+        "ElasticSearchFargateTaskDefinition": {
+            "Type": "AWS::ECS::TaskDefinition",
+            "Properties": {
+                "ExecutionRoleArn": {"Fn::GetAtt" : ["ECSTaskExecutionRole", "Arn"] },
+                "ContainerDefinitions": [
+                    {
+                        "Name": "ElasticSearchContainer",
+                        "Image": "elasticsearch:7.7.1",
+                        "Environment": [{
+                            "Name": "discovery.type",
+                            "Value": "single-node"
+                        }],
+                        "PortMappings": [
+                            {
+                                "ContainerPort": 9200
+                            },
+                            {
+                                "ContainerPort": 9300
+                            }                            
+                        ],
+                        "LogConfiguration": {
+                            "LogDriver": "awslogs",
+                            "Options": {
+                                "awslogs-create-group": true,
+                                "awslogs-group": "elasticsearch-logs",
+                                "awslogs-region": { "Ref" : "AWS::Region" },
+                                "awslogs-stream-prefix": "elasticsearch"
+                            }
+                        }
+                    }
+                ],
+                "Cpu": 2048,
+                "Memory": 8192,
+                "NetworkMode": "awsvpc",
+                "RequiresCompatibilities": [
+                    "FARGATE"
+                ]
+            }
+        },
+        "ElasticSearchECSService": {
+            "Type" : "AWS::ECS::Service",
+            "Properties" : {
+                "Cluster" : {"Ref": "ElasticSearchECSCluster"},
+                "DesiredCount": 1,
+                "LaunchType" : "FARGATE",
+                "NetworkConfiguration" : 
+                {                 
+                    "AwsvpcConfiguration" : {
+                        "AssignPublicIp": "ENABLED",
+                        "Subnets" : [{"Ref": "ElasticSearchVPCSubnet"}],
+                        "SecurityGroups": [{ "Ref" : "ElasticSearchVPCSecurityGroup" }]
+                    }
+                },
+                "ServiceName" : "ElasticSearchService",
+                "TaskDefinition" : {"Ref": "ElasticSearchFargateTaskDefinition"}
+              }
+        }
+
+
+    },
+    "Outputs": {
+
+    }
+}

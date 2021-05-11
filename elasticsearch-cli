@@ -1,0 +1,101 @@
+#!/usr/bin/env python
+import sys
+import boto3
+
+
+command = sys.argv[1:][0]
+cloudformation = boto3.client('cloudformation')
+
+
+def deploy(stack_name='elastic-search-node'):
+
+    with open('./elasticsearch-node-cloudformation-template.json', 'r') as template_file:
+        template = template_file.read()
+        try:
+            result = cloudformation.validate_template(TemplateBody=template)
+        except Exception as e:
+            print('Template validation error')
+            print(e)
+
+        try:
+            result = cloudformation.create_stack(
+                StackName=stack_name, TemplateBody=template, Capabilities=['CAPABILITY_NAMED_IAM'])
+
+            if(result['ResponseMetadata']['HTTPStatusCode'] == 200):
+                print('\nSuccessfully started deploy of ElasticSearch node')
+                print('\nCreating stack...')
+
+        except Exception as e:
+            print('\nFailed to create the stack: ' + stack_name + '\n')
+            print(e)
+
+        template_file.close()
+
+
+def destroy(stack_name='elastic-search-node'):
+
+    result = cloudformation.delete_stack(StackName=stack_name)
+
+    if(result['ResponseMetadata']['HTTPStatusCode'] == 200):
+        print('Succesfuly destroyed ElasticSearch stack')
+
+
+def showStatus(complete, failed, stack_name='elastic-search-node'):
+    print("======================= Deployment Status for: {} ========================\n".format(stack_name))
+
+    if(len(complete) == 0):
+        print('No status yet :( \n')
+    else:
+        for stack, name, resource_type, resource_status, timestamp in complete:
+            print("{} \t {} \t {} \t {} \t {} \n".format(
+                stack, name, resource_type, resource_status, timestamp))
+
+    print("\n====================== Error Events for: {} =================================".format(stack_name))
+
+    if(len(failed) == 0):
+        print('\nNo error events :) \n')
+    else:
+        for stack, name, resource_type, resource_status, reason, timestamp in failed:
+            print("\n{} \t {} \t {} \t {} \t {} \t {}".format(
+                stack, name, resource_type, resource_status, reason, timestamp))
+
+
+def status(stack_name='elastic-search-node'):
+
+    try:
+        result = cloudformation.describe_stack_events(StackName=stack_name)
+
+        complete = [(row['StackName'], row['LogicalResourceId'], row['ResourceType'], row['ResourceStatus'],
+                     row['Timestamp']) for row in result['StackEvents'] if row['ResourceStatus'] == 'CREATE_COMPLETE']
+
+        failed = [(row['StackName'], row['LogicalResourceId'], row['ResourceType'], row['ResourceStatus'], row['ResourceStatusReason'],
+                   row['Timestamp']) for row in result['StackEvents'] if row['ResourceStatus'] == 'CREATE_FAILED']
+
+        showStatus(complete, failed, stack_name)
+
+    except Exception as e:
+        print('Could not get status of the current stack deployment')
+
+
+if (command == 'deploy'):
+    deploy()
+elif(command == 'destroy'):
+    destroy()
+elif(command == 'status'):
+    status()
+elif(command == 'help' or command == '-h'):
+    print('''
+ElasticSearch CLI Tool v0.0.1
+=============================
+
+Usage: ./elasticsearch-cli [deploy | destroy | status | help]
+
+Available options:
+
+- deploy: Deploys a ElasticSearch node taking base on our current CloudFormation template
+- destroy: Destroy the current created CloudFormation stack for ElasticSearch node
+- status: Get information about current deployment
+- help (-h): This help
+    ''')
+else:
+    print('No option found for: ' + command)
